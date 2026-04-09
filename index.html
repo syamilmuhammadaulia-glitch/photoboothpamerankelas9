@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pameran Kelas 9 - Photo Booth</title>
+
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <link rel="stylesheet" href="./styles.css" />
+
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              primary: "#0846ed",
+              "primary-container": "#859aff",
+              "on-primary": "#f2f1ff",
+              background: "#f5f6f7",
+              surface: "#f5f6f7",
+              "surface-container-lowest": "#ffffff",
+              "surface-container-low": "#eff1f2",
+              "surface-container-high": "#e0e3e4",
+              "surface-container-highest": "#dadddf",
+              "on-surface": "#2c2f30",
+              "on-surface-variant": "#595c5d",
+              "outline-variant": "#abadae",
+              "tertiary-container": "#f790e0",
+            },
+            fontFamily: {
+              headline: ["Spline Sans"],
+              body: ["Plus Jakarta Sans"],
+              label: ["Plus Jakarta Sans"],
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body
+    class="bg-background text-on-surface min-h-screen overflow-x-hidden flex"
+  >
+    <aside
+      class="fixed left-0 top-0 h-screen w-64 bg-surface-container-lowest border-r border-outline-variant/20 hidden md:flex flex-col justify-between pt-28 pb-8 px-4 z-40 shadow-sm"
+    >
+      <nav class="flex flex-col gap-2">
+        <button
+          onclick="showView('landing')"
+          id="nav-landing"
+          class="nav-btn flex items-center gap-4 px-4 py-3 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors font-bold active-nav"
+        >
+          <span class="material-symbols-outlined">home</span> Beranda
+        </button>
+        <button
+          onclick="showView('camera')"
+          id="nav-camera"
+          class="nav-btn flex items-center gap-4 px-4 py-3 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors font-bold"
+        >
+          <span class="material-symbols-outlined">photo_camera</span> Capture
+        </button>
+        <button
+          onclick="showView('gallery')"
+          id="nav-gallery"
+          class="nav-btn flex items-center gap-4 px-4 py-3 rounded-xl text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors font-bold"
+        >
+          <span class="material-symbols-outlined">grid_view</span> Preview Hasil
+        </button>
+      </nav>
+
+      <div class="mt-auto pt-6 border-t border-outline-variant/10">
+        <div class="flex items-center gap-3 px-2">
+          <img
+            src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix&backgroundColor=2c3e50"
+            alt="Curator"
+            class="w-11 h-11 rounded-full object-cover border border-slate-200 shadow-sm"
+          />
+          <div class="flex flex-col overflow-hidden">
+            <p
+              class="text-sm font-black text-blue-600 whitespace-nowrap font-headline tracking-tight"
+            >
+              The Digital Curator
+            </p>
+            <p class="text-[11px] text-slate-400 whitespace-nowrap font-medium">
+              Grade 9 Exhibition
+            </p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <header
+      class="fixed top-0 w-full z-50 glass-nav shadow-sm flex justify-between items-center px-6 md:px-12 h-20"
+    >
+      <div class="flex items-center gap-3 md:ml-64">
+        <div
+          class="w-10 h-10 rounded-full bg-primary flex items-center justify-center"
+        >
+          <span
+            class="material-symbols-outlined text-white"
+            style="font-variation-settings: &quot;FILL&quot; 1"
+            >photo_camera</span
+          >
+        </div>
+        <h1
+          class="text-2xl font-bold tracking-tighter text-on-surface font-headline"
+        >
+          Pameran Kelas 9
+        </h1>
+      </div>
+      <nav class="hidden md:flex items-center gap-8">
+        <a
+          class="text-slate-600 font-bold hover:text-blue-600 transition-all duration-300 py-1 cursor-pointer"
+          onclick="showView('landing')"
+          >Beranda</a
+        >
+        <a
+          class="text-slate-600 font-bold hover:text-blue-600 transition-all duration-300 py-1 cursor-pointer"
+          onclick="showView('tentang')"
+          >Tentang</a
+        >
+      </nav>
+      <div class="flex items-center gap-4">
+        <select
+          id="camera-select"
+          class="hidden lg:block bg-surface-container-lowest border border-outline-variant text-sm rounded-lg px-3 py-2 outline-none focus:border-primary"
+        >
+          <option value="">Memuat Kamera...</option>
+        </select>
+      </div>
+    </header>
+
+    <div
+      id="app-container"
+      class="md:ml-64 pt-24 md:pt-28 pb-20 px-6 md:px-12 max-w-7xl mx-auto w-full"
+    >
+      <main id="view-landing" class="block animate-fade-in">
+        <section class="mb-12 text-center md:text-left relative">
+          <div
+            class="absolute -top-24 -left-24 w-96 h-96 bg-tertiary-container opacity-20 blur-3xl rounded-full -z-10"
+          ></div>
+
+          <div
+            class="inline-block px-4 py-1.5 mb-6 rounded-full bg-primary/10 text-primary font-bold text-sm tracking-wide uppercase font-headline"
+          >
+            Digital Curator Booth
+          </div>
+
+          <h2
+            class="text-5xl md:text-7xl font-extrabold tracking-tight text-on-surface mb-6 font-headline max-w-4xl"
+          >
+            Abadikan Momen <span class="text-primary">Pameran Kelas 9</span>
+          </h2>
+
+          <p
+            class="text-lg md:text-xl text-on-surface-variant max-w-2xl leading-relaxed mb-8"
+          >
+            Sesi pemotretan otomatis 4 pose. Silakan isi buku tamu dan pilih
+            template desain untuk memulai.
+          </p>
+
+          <div
+            class="bg-white/60 backdrop-blur-md p-6 md:p-8 rounded-2xl shadow-sm border border-outline-variant/20 max-w-3xl mb-12 flex flex-col md:flex-row gap-6"
+          >
+            <div class="flex-1 text-left relative">
+              <label
+                class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3"
+              >
+                <span class="material-symbols-outlined text-sm">person</span>
+                Nama Pengunjung
+              </label>
+              <input
+                type="text"
+                id="visitor-name"
+                placeholder="Contoh: Syamil Muhammad"
+                class="w-full bg-surface-container-lowest border border-outline-variant/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl px-4 py-4 font-medium transition-all outline-none"
+              />
+            </div>
+
+            <div class="flex-1 text-left relative">
+              <label
+                class="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-3"
+              >
+                <span class="material-symbols-outlined text-sm"
+                  >phone_iphone</span
+                >
+                Nomor WhatsApp
+              </label>
+              <div class="relative flex items-center">
+                <div
+                  class="absolute left-0 bg-slate-100 border-r border-outline-variant/30 text-slate-500 font-bold px-4 py-4 rounded-l-xl h-full flex items-center"
+                >
+                  +62
+                </div>
+                <input
+                  type="tel"
+                  id="visitor-phone"
+                  placeholder="81234567890"
+                  class="w-full bg-surface-container-lowest border border-outline-variant/30 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-xl pl-16 pr-4 py-4 font-medium transition-all outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+          <div
+            class="group relative overflow-hidden rounded-xl bg-surface-container-lowest transition-all duration-500 hover:scale-[1.02] shadow-sm hover:shadow-xl cursor-pointer"
+            onclick="selectTemplateAndStart('UMUM')"
+          >
+            <div class="aspect-[16/9] relative bg-slate-200">
+              <div
+                class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10"
+              ></div>
+              <img
+                src="https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=1000&auto=format&fit=crop"
+                class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                alt="Umum"
+              />
+            </div>
+            <div class="absolute bottom-0 left-0 p-8 w-full z-20">
+              <h3 class="text-4xl font-bold text-white mb-2 font-headline">
+                Template Umum
+              </h3>
+              <p class="text-slate-200 mb-6 text-sm">
+                Frame eksklusif untuk pengunjung pameran.
+              </p>
+              <button
+                class="px-6 py-3 rounded-full hero-gradient text-white font-bold flex items-center gap-2 shadow-lg hover:shadow-xl transition-shadow"
+              >
+                Pilih & Mulai
+                <span class="material-symbols-outlined">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="group relative overflow-hidden rounded-xl bg-surface-container-lowest transition-all duration-500 hover:scale-[1.02] shadow-sm hover:shadow-xl cursor-pointer"
+            onclick="selectTemplateAndStart('SMP')"
+          >
+            <div class="aspect-[16/9] relative bg-slate-200">
+              <div
+                class="absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent z-10"
+              ></div>
+              <img
+                src="smp.jpg"
+                class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700"
+                alt="SMP"
+              />
+            </div>
+            <div class="absolute bottom-0 left-0 p-8 w-full z-20">
+              <h3 class="text-4xl font-bold text-white mb-2 font-headline">
+                Template SMP
+              </h3>
+              <p class="text-slate-100 mb-6 text-sm">
+                Frame khusus Kelas 9 SMPIP Baitul Maal.
+              </p>
+              <button
+                class="px-6 py-3 rounded-full bg-white text-primary font-bold flex items-center gap-2 shadow-lg hover:shadow-xl transition-shadow"
+              >
+                Pilih & Mulai
+                <span class="material-symbols-outlined">school</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <main id="view-tentang" class="hidden flex-col">
+        <div
+          class="bg-surface-container-lowest p-8 md:p-12 rounded-2xl shadow-sm border border-outline-variant/15 relative overflow-hidden"
+        >
+          <div
+            class="absolute -right-20 -top-20 w-64 h-64 bg-primary/10 rounded-full blur-3xl"
+          ></div>
+          <span
+            class="text-primary font-bold text-sm tracking-[0.2em] uppercase mb-4 block"
+            >Informasi Proyek</span
+          >
+          <h2 class="text-4xl font-extrabold font-headline mb-6">
+            Tentang <span class="text-primary">Photobooth Digital</span>
+          </h2>
+
+          <div
+            class="space-y-6 text-lg text-slate-600 leading-relaxed max-w-3xl"
+          >
+            <p>
+              Selamat datang di <strong>Photobooth Pameran Kelas 9</strong>!
+              Platform ini dikembangkan sebagai karya inovatif untuk memeriahkan
+              dan mendokumentasikan momen berharga selama acara Pameran Kelas 9
+              di SMP Islam Plus Baitul Maal.
+            </p>
+            <p>
+              <strong>Tujuan Proyek:</strong><br />
+              Kami ingin memberikan pengalaman interaktif bagi pengunjung
+              pameran. Alih-alih hanya berfoto menggunakan kamera ponsel biasa,
+              pengunjung dapat merasakan sensasi
+              <em>photobooth</em> profesional. Sistem ini dirancang untuk
+              mengambil 4 pose foto secara otomatis, menggabungkannya ke dalam
+              bingkai digital (frame) khusus pameran, dan menyimpannya langsung
+              ke sistem Cloud.
+            </p>
+            <p>
+              <strong>Fitur Utama:</strong>
+            </p>
+            <ul class="list-disc pl-6 space-y-2">
+              <li>Pengambilan 4 pose otomatis dengan hitung mundur.</li>
+              <li>Integrasi Cloud Storage (Google Drive) secara langsung.</li>
+              <li>
+                Pembuatan QR Code otomatis untuk kemudahan unduh (download).
+              </li>
+              <li>
+                Format pengiriman otomatis melalui WhatsApp beserta informasi
+                resmi sekolah.
+              </li>
+            </ul>
+            <p class="mt-8 font-medium italic text-slate-500">
+              "Teknologi yang mempertemukan kreativitas siswa dengan kenangan
+              tak terlupakan." - The Digital Curator.
+            </p>
+          </div>
+        </div>
+      </main>
+
+      <main id="view-camera" class="hidden flex-col relative min-h-[80vh]">
+        <header
+          class="mb-4 flex flex-col md:flex-row justify-between items-end gap-4"
+        >
+          <div>
+            <span
+              class="text-primary font-bold text-sm tracking-[0.2em] uppercase mb-2 block"
+              >Step 01 — Capture (4 Pose)</span
+            >
+            <h1
+              class="text-4xl font-extrabold tracking-tighter text-on-surface leading-[0.9]"
+            >
+              Siapkan <span class="text-primary">Gayamu.</span>
+            </h1>
+          </div>
+        </header>
+
+        <section class="flex-grow flex flex-col gap-6 relative">
+          <div
+            id="video-wrapper"
+            class="relative w-full aspect-video md:aspect-[16/9] bg-black rounded-xl overflow-hidden shadow-2xl flex items-center justify-center transition-opacity duration-150"
+          >
+            <video
+              id="camera-feed"
+              class="w-full h-full object-cover transform -scale-x-100"
+              autoplay
+              playsinline
+            ></video>
+
+            <div
+              id="countdown-overlay"
+              class="absolute inset-0 flex flex-col items-center justify-center bg-black/50 z-30 hidden backdrop-blur-sm"
+            >
+              <span
+                id="countdown-text"
+                class="text-white font-headline font-black text-9xl drop-shadow-2xl"
+                >3</span
+              >
+              <span
+                id="pose-status"
+                class="mt-4 bg-primary text-white px-6 py-2 rounded-full font-bold tracking-widest uppercase shadow-lg"
+                >Pose 1 / 4</span
+              >
+            </div>
+
+            <div
+              class="absolute top-6 left-6 bg-surface/80 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 z-20"
+            >
+              <span
+                class="w-3 h-3 bg-red-500 rounded-full animate-pulse"
+              ></span>
+              <span
+                class="text-xs font-bold tracking-widest uppercase text-on-surface"
+                >Live</span
+              >
+            </div>
+          </div>
+
+          <div
+            class="bg-surface-container-low rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6"
+          >
+            <div class="flex flex-col gap-2">
+              <h4
+                class="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label text-center md:text-left"
+              >
+                Durasi per pose
+              </h4>
+              <div class="flex gap-2" id="timer-buttons">
+                <button
+                  onclick="setTimer(1)"
+                  class="timer-btn py-3 px-6 rounded-full bg-primary text-white font-bold text-sm shadow-sm"
+                  data-time="1"
+                >
+                  1s
+                </button>
+                <button
+                  onclick="setTimer(3)"
+                  class="timer-btn py-3 px-6 rounded-full bg-primary text-white font-bold text-sm shadow-sm"
+                  data-time="3"
+                >
+                  3s
+                </button>
+                <button
+                  onclick="setTimer(5)"
+                  class="timer-btn py-3 px-6 rounded-full bg-surface-container-lowest text-on-surface font-bold text-sm border-2 border-transparent hover:border-primary-container transition-all"
+                  data-time="5"
+                >
+                  5s
+                </button>
+              </div>
+            </div>
+
+            <button
+              id="btn-start-capture"
+              onclick="startSequenceCapture()"
+              class="bg-gradient-to-br from-primary to-primary-container text-white px-12 py-4 rounded-full flex items-center gap-3 shadow-xl hover:scale-[1.02] transition-transform duration-300 w-full md:w-auto justify-center"
+            >
+              <span
+                class="material-symbols-outlined text-3xl"
+                style="font-variation-settings: &quot;FILL&quot; 1"
+                >photo_camera</span
+              >
+              <span class="text-xl font-bold font-headline"
+                >Mulai Otomatis (4 Foto)</span
+              >
+            </button>
+          </div>
+        </section>
+      </main>
+
+      <main id="view-result" class="hidden flex-col gap-8">
+        <header
+          class="mb-4 flex flex-col md:flex-row justify-between items-end gap-4"
+        >
+          <div>
+            <span
+              class="text-primary font-bold text-sm tracking-[0.2em] uppercase mb-2 block"
+              >Step 02 — Exhibition Ready</span
+            >
+            <h1
+              class="text-5xl font-extrabold tracking-tighter text-on-surface leading-[0.9]"
+            >
+              Masterpiece <br /><span class="text-primary">Captured.</span>
+            </h1>
+          </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <section class="lg:col-span-7 relative">
+            <div
+              class="rounded-xl overflow-hidden shadow-2xl bg-surface-container-lowest border border-outline-variant/20 flex justify-center bg-gray-100 p-4"
+            >
+              <canvas id="main-canvas" class="hidden"></canvas>
+              <img
+                id="result-display"
+                src=""
+                alt="Processing..."
+                class="w-full max-w-md h-auto object-contain rounded shadow-lg"
+              />
+            </div>
+          </section>
+
+          <section class="lg:col-span-5 flex flex-col gap-6">
+            <div
+              class="bg-surface-container-low p-8 rounded-xl flex flex-col gap-4 border border-outline-variant/15 text-center"
+            >
+              <h3 class="text-xl font-bold font-headline mb-2">
+                Cloud Storage
+              </h3>
+              <div
+                id="upload-status-text"
+                class="text-sm font-bold text-primary animate-pulse"
+              >
+                Sedang mengunggah ke Google Drive...
+              </div>
+              <div
+                id="qrcode-ui-container"
+                class="hidden flex-col items-center gap-3 mt-2 bg-white p-4 rounded-lg mx-auto shadow-sm"
+              >
+                <div id="qr-element"></div>
+                <p
+                  class="text-xs font-bold text-slate-500 uppercase tracking-widest"
+                >
+                  Scan untuk Download HD
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="bg-surface-container-lowest p-8 rounded-xl border border-outline-variant/15 shadow-sm"
+            >
+              <div class="flex items-center gap-3 mb-6">
+                <span class="material-symbols-outlined text-[#25D366] text-3xl"
+                  >chat</span
+                >
+                <div>
+                  <h4 class="font-bold text-lg leading-tight">
+                    Kirim ke WhatsApp
+                  </h4>
+                  <p class="text-xs text-slate-500">
+                    Kirim link Drive beserta info sekolah
+                  </p>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <div
+                  class="bg-surface-container-low px-4 py-3 rounded-lg font-bold flex items-center"
+                >
+                  +62
+                </div>
+                <input
+                  id="wa-number"
+                  type="tel"
+                  class="flex-1 bg-surface-container-low border-0 focus:ring-2 focus:ring-primary rounded-lg px-4 py-3 font-medium placeholder:text-outline-variant"
+                  placeholder="812 3456 7890"
+                />
+              </div>
+              <button
+                onclick="shareWA()"
+                class="w-full mt-4 bg-[#25D366] text-white font-bold py-4 rounded-lg flex items-center justify-center gap-2 hover:opacity-90 shadow-lg shadow-green-500/30 transition-all active:scale-95"
+              >
+                Kirim Tautan Foto
+                <span class="material-symbols-outlined text-sm">send</span>
+              </button>
+            </div>
+
+            <div class="flex gap-4">
+              <button
+                onclick="downloadImage()"
+                class="flex-1 bg-primary text-white py-4 rounded-lg font-bold transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-2 shadow-md"
+              >
+                <span class="material-symbols-outlined">download</span> Simpan
+              </button>
+              <button
+                onclick="resetApp()"
+                class="flex-1 bg-surface-container-highest text-on-surface py-4 rounded-lg font-bold transition-all hover:bg-surface-dim active:scale-95 flex items-center justify-center gap-2"
+              >
+                <span class="material-symbols-outlined">refresh</span> Ulangi
+              </button>
+            </div>
+          </section>
+        </div>
+      </main>
+
+      <main id="view-gallery" class="hidden flex-col gap-6">
+        <header
+          class="mb-6 flex flex-col md:flex-row md:justify-between md:items-end gap-4"
+        >
+          <div>
+            <span
+              class="text-primary font-bold text-sm tracking-[0.2em] uppercase mb-2 block"
+              >Gallery Manager</span
+            >
+            <h1
+              class="text-4xl font-extrabold tracking-tighter text-on-surface"
+            >
+              Riwayat <span class="text-primary">Photobooth</span>
+            </h1>
+            <p class="text-slate-500 mt-2">
+              Kelola, simpan, dan bagikan semua hasil karya pameran kelas 9.
+            </p>
+          </div>
+
+          <button
+            onclick="clearAllGallery()"
+            class="text-red-500 font-bold text-sm flex items-center gap-2 hover:underline bg-red-50 px-4 py-2 rounded-lg transition-colors hover:bg-red-100"
+          >
+            <span class="material-symbols-outlined text-lg">delete_sweep</span>
+            Hapus Semua
+          </button>
+        </header>
+
+        <div
+          id="gallery-container"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8"
+        >
+          <div
+            class="col-span-full text-center py-20 bg-surface-container-low rounded-xl border border-dashed border-outline-variant"
+          >
+            <span class="material-symbols-outlined text-6xl text-slate-300 mb-4"
+              >photo_library</span
+            >
+            <p class="text-slate-500 font-medium">
+              Belum ada karya yang tersimpan.
+            </p>
+            <button
+              onclick="showView('camera')"
+              class="mt-4 bg-primary text-white px-6 py-2 rounded-full font-bold shadow-sm transition-transform active:scale-95 hover:opacity-90"
+            >
+              Mulai Capture
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

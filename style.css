@@ -1,0 +1,103 @@
+/* Styling Ikon Material */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
+/* Base Typography */
+body {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Spline Sans", sans-serif;
+}
+
+/* Custom Gradients & Backgrounds */
+.hero-gradient {
+  background: linear-gradient(135deg, #0846ed 0%, #859aff 100%);
+}
+
+.glass-nav {
+  background: rgba(245, 246, 247, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Flash Efek untuk UI Kamera */
+.flash-effect {
+  opacity: 0.2;
+  background-color: white;
+}
+
+/* Container untuk output QR JS (Fix bug border hitam) */
+#qr-element img {
+  margin: 0 auto;
+}
+/* Styling Ikon Material */
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
+/* Base Typography */
+body {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+h1,
+h2,
+h3 {
+  font-family: "Spline Sans", sans-serif;
+}
+
+/* Custom Gradients & Backgrounds */
+.hero-gradient {
+  background: linear-gradient(135deg, #0846ed 0%, #859aff 100%);
+}
+
+.glass-nav {
+  background: rgba(245, 246, 247, 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Flash Efek untuk UI Kamera */
+.flash-effect {
+  opacity: 0.2;
+  background-color: white;
+}
+
+/* Container untuk output QR JS (Fix bug border hitam) */
+#qr-element img {
+  margin: 0 auto;
+}
+
+/* Sidebar Active State Class */
+.active-nav {
+  background-color: #eff6ff !important; /* Tailwind blue-50 */
+  color: #2563eb !important; /* Tailwind blue-600 */
+}
+/* Gallery Card Styles */
+.gallery-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.gallery-card:hover {
+  transform: translateY(-8px);
+}
+.action-overlay {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gallery-card:hover .action-overlay {
+  opacity: 1;
+}
