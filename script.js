@@ -527,7 +527,11 @@ function shareWA() {
       ` Instagram: @smpip_baitul_maal\n` +
       ` YouTube: SMPIP Baitul Maal\n` +
       ` TikTok: @smpip_baitulmaal\n` +
-      ` FB: Smpip Baitul Maal`,
+      ` FB: Smpip Baitul Maal\n\n` +
+      `--------------------------------------------\n` +
+      `💻 *Sistem Photobooth ini dikembangkan oleh:*\n` +
+      `Syamil Muhammad Aulia\n` +
+      `🌐 https://syamil.vercel.app`,
   );
 
   window.open(`https://wa.me/${cleanNumber}?text=${message}`, "_blank");
