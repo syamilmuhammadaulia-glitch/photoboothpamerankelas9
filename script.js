@@ -1,6 +1,7 @@
 // ==========================================
 // CONFIGURATION
 // ==========================================
+// Pastikan URL ini adalah Web App URL yang BARU jika kamu men-deploy ulang
 const GOOGLE_SCRIPT_URL =
   "https://script.google.com/macros/s/AKfycbyfQY3WrU1Wv1HI3QxELvQSB-tqV7iJ3p6Pi0Vt86iCyIaYMfQt-b3wzQGwAtwoFpA/exec";
 
@@ -24,15 +25,15 @@ const cameraSelect = document.getElementById("camera-select");
 const btnStartCapture = document.getElementById("btn-start-capture");
 const galleryContainer = document.getElementById("gallery-container");
 
-// Efek Suara Kamera (Shutter)
+// Efek Suara Kamera (Diganti ke MP3 standar agar tidak error NotSupported)
 const shutterSound = new Audio(
-  "https://www.myinstants.com/media/sounds/camera-shutter-click-01.mp3",
+  "https://upload.wikimedia.org/wikipedia/commons/d/d3/Camera_click.ogg",
 );
 
 let videoStream = null;
 let currentDeviceId = null;
 let selectedTemplate = "UMUM";
-let selectedLayout = "GRID"; // Pilihan baru: GRID (2x2) atau STRIP (1x4)
+let selectedLayout = "GRID";
 let selectedTime = 3;
 let capturedPhotos = [];
 let lastFolderUrl = "";
@@ -123,7 +124,6 @@ async function startCamera(deviceId) {
   }
 }
 
-// Update fungsi untuk menerima 2 parameter (Template & Layout)
 function selectTemplateAndStart(templateName, layout = "GRID") {
   selectedTemplate = templateName;
   selectedLayout = layout;
@@ -154,7 +154,16 @@ async function startSequenceCapture() {
   btnStartCapture.disabled = true;
   btnStartCapture.classList.add("opacity-50");
   capturedPhotos = [];
-  currentSessionId = "SESS-" + Date.now(); // Buat ID Sesi unik
+  currentSessionId = "SESS-" + Date.now();
+
+  // Memancing audio agar diizinkan browser
+  try {
+    shutterSound.volume = 0;
+    await shutterSound.play();
+    shutterSound.pause();
+    shutterSound.currentTime = 0;
+    shutterSound.volume = 1;
+  } catch (e) {} // Abaikan jika masih diblokir browser
 
   const overlay = document.getElementById("countdown-overlay");
   const txtCount = document.getElementById("countdown-text");
@@ -171,11 +180,11 @@ async function startSequenceCapture() {
 
     overlay.classList.add("hidden");
 
-    // Mainkan suara jepretan kamera
-    shutterSound.currentTime = 0;
-    shutterSound
-      .play()
-      .catch((e) => console.log("Audio autoplay diblokir browser"));
+    // Putar suara saat memotret
+    try {
+      shutterSound.currentTime = 0;
+      shutterSound.play();
+    } catch (e) {}
 
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = video.videoWidth;
@@ -204,10 +213,9 @@ async function startSequenceCapture() {
 }
 
 // ==========================================
-// CANVAS RENDERING (Mendukung GRID & STRIP)
+// CANVAS RENDERING
 // ==========================================
 async function drawCompiledCanvas() {
-  // Setup ukuran canvas berdasarkan layout
   if (selectedLayout === "STRIP") {
     mainCanvas.width = 600;
     mainCanvas.height = 1800;
@@ -223,13 +231,11 @@ async function drawCompiledCanvas() {
     let x, y, photoW, photoH;
 
     if (selectedLayout === "STRIP") {
-      // Logic untuk Strip Memanjang (1x4)
       photoW = 500;
       photoH = 350;
       x = 50;
       y = 200 + i * (photoH + 30);
     } else {
-      // Logic untuk Grid Kotak (2x2) Default
       photoW = 502;
       photoH = 500;
       const col = i % 2;
@@ -251,7 +257,6 @@ async function drawCompiledCanvas() {
   });
 
   const frameImg = new Image();
-  // Format nama file: frame-umum.png atau frame-umum-strip.png
   let frameName = `frame-${selectedTemplate.toLowerCase()}`;
   if (selectedLayout === "STRIP") frameName += "-strip";
   frameImg.src = `${frameName}.png`;
@@ -270,8 +275,6 @@ async function drawCompiledCanvas() {
   }
 
   updateResultDisplay();
-
-  // Trigger auto upload ke cloud (sekarang membawa data pengunjung)
   await processCloudUpload();
 }
 
@@ -280,28 +283,38 @@ function updateResultDisplay() {
 }
 
 // ==========================================
-// CLOUD STORAGE & DATABASE (Google Apps Script)
+// CLOUD STORAGE & DATABASE
 // ==========================================
 async function processCloudUpload() {
   const statusText = document.getElementById("upload-status-text");
 
-  // Ambil data pengunjung dari input HTML (jika elemennya ada)
-  const visitorName =
-    document.getElementById("visitor-name")?.value || "Pengunjung Anonim";
-  const visitorPhone = document.getElementById("visitor-phone")?.value || "-";
+  const visitorNameNode = document.getElementById("visitor-name");
+  const visitorPhoneNode = document.getElementById("visitor-phone");
+  const visitorName = visitorNameNode
+    ? visitorNameNode.value
+    : "Pengunjung Anonim";
+  const visitorPhone = visitorPhoneNode ? visitorPhoneNode.value : "-";
 
   try {
-    // Mengirim Action Database Baru ke Backend
+    // 1. Panggil GAS untuk Buat Folder & Log
+    // Perhatikan: Kita TIDAK mengirimkan headers Content-Type
+    // agar browser mengirimkannya sebagai text/plain default (menghindari CORS)
     const response = await fetch(GOOGLE_SCRIPT_URL, {
       method: "POST",
       body: JSON.stringify({
-        action: "create_folder_and_log", // Memanggil fungsi database di GAS
+        action: "create_folder_and_log",
         id_sesi: currentSessionId,
         nama_pengunjung: visitorName,
         no_telepon: visitorPhone,
         template: selectedTemplate + " (" + selectedLayout + ")",
       }),
     });
+
+    // Cek apakah response OK sebelum parsing JSON
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
     const folderData = await response.json();
 
     if (folderData.status === "success") {
@@ -310,11 +323,11 @@ async function processCloudUpload() {
       await generateAndDrawQR(folderData.folderUrl);
       updateResultDisplay();
 
-      // Simpan Ke Galeri Lokal
-      const finalDataUrl = mainCanvas.toDataURL("image/jpeg", 0.9);
+      // SIMPAN KE GALERI LOKAL
+      const compressedDataUrl = mainCanvas.toDataURL("image/jpeg", 0.3);
       const newSession = {
         id: currentSessionId,
-        image: finalDataUrl,
+        image: compressedDataUrl,
         template: selectedTemplate,
         date: new Date().toLocaleString("id-ID"),
         driveUrl: lastFolderUrl,
@@ -330,9 +343,10 @@ async function processCloudUpload() {
       const uploads = capturedPhotos.map((img, i) =>
         uploadSingleFile(img.src, `Pose_${i + 1}.jpg`, folderData.folderId),
       );
+
       uploads.push(
         uploadSingleFile(
-          finalDataUrl,
+          mainCanvas.toDataURL("image/jpeg", 0.95),
           "Final_Photobooth.jpg",
           folderData.folderId,
         ),
@@ -342,10 +356,112 @@ async function processCloudUpload() {
 
       statusText.innerHTML = "✅ Data tersimpan di Database & Cloud!";
       statusText.classList.replace("text-slate-600", "text-green-600");
+    } else {
+      throw new Error(folderData.message || "Error dari Apps Script");
     }
   } catch (err) {
     console.error("Gagal Upload:", err);
-    statusText.innerHTML = "❌ Gagal membuat koneksi ke Database.";
+    statusText.innerHTML =
+      "❌ Koneksi ke Database Gagal. Periksa Console (F12).";
+    statusText.classList.add("text-red-500");
+  }
+}
+
+async function uploadSingleFile(base64Str, filename, folderId) {
+  const cleanBase64 = base64Str.split(",")[1];
+
+  // Sama seperti di atas, hindari penggunaan headers
+  return fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "upload_file",
+      folderId: folderId,
+      image: cleanBase64,
+      filename: filename,
+    }),
+  });
+}
+// CLOUD STORAGE & DATABASE
+// ==========================================
+async function processCloudUpload() {
+  const statusText = document.getElementById("upload-status-text");
+
+  const visitorNameNode = document.getElementById("visitor-name");
+  const visitorPhoneNode = document.getElementById("visitor-phone");
+  const visitorName = visitorNameNode
+    ? visitorNameNode.value
+    : "Pengunjung Anonim";
+  const visitorPhone = visitorPhoneNode ? visitorPhoneNode.value : "-";
+
+  try {
+    // Dihapus pengaturan header agar browser menggunakan default text/plain
+    // Ini adalah kunci agar lolos dari blokir CORS Google
+    const response = await fetch(
+      "https://script.google.com/macros/s/AKfycbyfQY3WrU1Wv1HI3QxELvQSB-tqV7iJ3p6Pi0Vt86iCyIaYMfQt-b3wzQGwAtwoFpA/exec",
+      {
+        redirect: "follow", // Tambahkan baris ini
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8", // Tambahkan baris ini
+        },
+        body: JSON.stringify({
+          action: "create_folder_and_log",
+          id_sesi: currentSessionId,
+          nama_pengunjung: visitorName,
+          no_telepon: visitorPhone,
+          template: selectedTemplate + " (" + selectedLayout + ")",
+        }),
+      },
+    );
+
+    const folderData = await response.json();
+
+    if (folderData.status === "success") {
+      lastFolderUrl = folderData.folderUrl;
+
+      await generateAndDrawQR(folderData.folderUrl);
+      updateResultDisplay();
+
+      // SIMPAN KE GALERI LOKAL (Gunakan resolusi rendah untuk menghindari QuotaExceededError)
+      const compressedDataUrl = mainCanvas.toDataURL("image/jpeg", 0.3);
+      const newSession = {
+        id: currentSessionId,
+        image: compressedDataUrl,
+        template: selectedTemplate,
+        date: new Date().toLocaleString("id-ID"),
+        driveUrl: lastFolderUrl,
+      };
+
+      gallerySessions.unshift(newSession);
+      saveToLocalStorage();
+
+      statusText.innerText = "Mengunggah foto ke Cloud (Latar Belakang)...";
+      statusText.classList.remove("animate-pulse");
+      statusText.classList.add("text-slate-600");
+
+      const uploads = capturedPhotos.map((img, i) =>
+        uploadSingleFile(img.src, `Pose_${i + 1}.jpg`, folderData.folderId),
+      );
+
+      uploads.push(
+        uploadSingleFile(
+          mainCanvas.toDataURL("image/jpeg", 0.95),
+          "Final_Photobooth.jpg",
+          folderData.folderId,
+        ),
+      );
+
+      await Promise.all(uploads);
+
+      statusText.innerHTML = "✅ Data tersimpan di Database & Cloud!";
+      statusText.classList.replace("text-slate-600", "text-green-600");
+    } else {
+      throw new Error(folderData.message || "Error tidak diketahui");
+    }
+  } catch (err) {
+    console.error("Gagal Upload:", err);
+    statusText.innerHTML =
+      "❌ Koneksi ke Database Gagal. Periksa Deployment App Script.";
     statusText.classList.add("text-red-500");
   }
 }
@@ -354,7 +470,6 @@ async function uploadSingleFile(base64Str, filename, folderId) {
   const cleanBase64 = base64Str.split(",")[1];
   return fetch(GOOGLE_SCRIPT_URL, {
     method: "POST",
-    mode: "no-cors",
     body: JSON.stringify({
       action: "upload_file",
       folderId: folderId,
@@ -383,7 +498,6 @@ async function generateAndDrawQR(url) {
 
   const qrCanvas = qrElement.querySelector("canvas");
   if (qrCanvas) {
-    // Posisi QR disesuaikan berdasarkan Layout (GRID atau STRIP)
     const qrSize = 235;
     const qrX = selectedLayout === "STRIP" ? 180 : 845;
     const qrY = selectedLayout === "STRIP" ? 1500 : 1456;
@@ -392,13 +506,23 @@ async function generateAndDrawQR(url) {
 }
 
 // ==========================================
-// MANAJEMEN GALERI LOKAL
+// MANAJEMEN GALERI LOKAL & MEMORI BROWSER
 // ==========================================
 function saveToLocalStorage() {
-  localStorage.setItem(
-    "booth_gallery",
-    JSON.stringify(gallerySessions.slice(0, 30)),
-  );
+  try {
+    localStorage.setItem(
+      "booth_gallery",
+      JSON.stringify(gallerySessions.slice(0, 10)),
+    );
+  } catch (e) {
+    if (
+      e.name === "QuotaExceededError" ||
+      e.name === "NS_ERROR_DOM_QUOTA_REACHED"
+    ) {
+      gallerySessions.pop();
+      saveToLocalStorage();
+    }
+  }
 }
 
 function renderGallery() {
