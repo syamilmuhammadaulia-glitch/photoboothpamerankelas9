@@ -42,6 +42,9 @@ let currentSessionId = "";
 // STATE LOKAL UNTUK GALERI
 let gallerySessions = JSON.parse(localStorage.getItem("booth_gallery")) || [];
 
+let generatedGifUrl = null;
+let isGifReady = false;
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // ==========================================
@@ -104,6 +107,13 @@ function showView(viewName) {
     document.getElementById("nav-gallery")?.classList.add("active-nav");
     renderGallery();
   }
+
+  // Kontrol aktif/nonaktif Voice Command
+  if (viewName === "camera") {
+    if (typeof startVoiceCommand === "function") startVoiceCommand();
+  } else {
+    if (typeof stopVoiceCommand === "function") stopVoiceCommand();
+  }
 }
 
 async function startCamera(deviceId) {
@@ -159,11 +169,46 @@ async function startSequenceCapture() {
   // Memancing audio agar diizinkan browser
   try {
     shutterSound.volume = 0;
-    await shutterSound.play();
-    shutterSound.pause();
-    shutterSound.currentTime = 0;
-    shutterSound.volume = 1;
-  } catch (e) {} // Abaikan jika masih diblokir browser
+    const playPromise = shutterSound.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .catch((e) => {
+          console.warn("Autoplay audio diblokir/tidak didukung:", e.message);
+        })
+        .finally(() => {
+          shutterSound.pause();
+          shutterSound.currentTime = 0;
+          shutterSound.volume = 1;
+        });
+    } else {
+      shutterSound.pause();
+      shutterSound.currentTime = 0;
+      shutterSound.volume = 1;
+    }
+  } catch (e) {
+    console.warn("Audio exception:", e);
+  }
+
+  // Reset GIF state untuk sesi baru
+  isGifReady = false;
+  generatedGifUrl = null;
+  const gifBtn = document.getElementById("btn-download-gif");
+  if (gifBtn) {
+    gifBtn.disabled = true;
+    gifBtn.classList.add(
+      "opacity-50",
+      "cursor-not-allowed",
+      "bg-tertiary-container",
+      "text-on-surface",
+    );
+    gifBtn.classList.remove("bg-[#E1306C]", "text-white");
+    document.getElementById("gif-btn-text").innerText = "Proses GIF...";
+  }
+  const gifImg = document.getElementById("gif-display");
+  if (gifImg) gifImg.src = "";
+
+  // Pastikan kembali ke tab Grid
+  if (typeof switchPreview === "function") switchPreview("grid");
 
   const overlay = document.getElementById("countdown-overlay");
   const txtCount = document.getElementById("countdown-text");
@@ -173,8 +218,14 @@ async function startSequenceCapture() {
     overlay.classList.remove("hidden");
     txtPose.innerText = `Pose ${i} / 4`;
 
-    for (let s = selectedTime; s > 0; s--) {
-      txtCount.innerText = s;
+    for (let t = selectedTime; t > 0; t--) {
+      txtCount.innerText = t;
+      
+      // Trigger animasi pop font angka CSS
+      txtCount.classList.remove("countdown-pop");
+      void txtCount.offsetWidth;
+      txtCount.classList.add("countdown-pop");
+
       await wait(1000);
     }
 
@@ -183,8 +234,15 @@ async function startSequenceCapture() {
     // Putar suara saat memotret
     try {
       shutterSound.currentTime = 0;
-      shutterSound.play();
-    } catch (e) {}
+      const playPromise = shutterSound.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((e) => {
+          console.warn("Gagal memutar suara shutter:", e.message);
+        });
+      }
+    } catch (e) {
+      console.warn("Audio play exception:", e);
+    }
 
     const tempCanvas = document.createElement("canvas");
     tempCanvas.width = video.videoWidth;
@@ -209,11 +267,16 @@ async function startSequenceCapture() {
   btnStartCapture.classList.remove("opacity-50");
 
   showView("result");
+
+  // Rendernya ditunggu dulu supaya user langsung lihat grid statis
   await drawCompiledCanvas();
+
+  // Langsung gas upload, GIF akan digenerate setelah dapat folder ID untuk QR Code
+  await processCloudUpload();
 }
 
 // ==========================================
-// CANVAS RENDERING
+// CANVAS RENDERING (FOTO GRID STATIS)
 // ==========================================
 async function drawCompiledCanvas() {
   if (selectedLayout === "STRIP") {
@@ -274,12 +337,119 @@ async function drawCompiledCanvas() {
     ctx.fillText(`PAMERAN KELAS 9 - ${selectedTemplate}`, 50, 100);
   }
 
-  updateResultDisplay();
-  await processCloudUpload();
+  document.getElementById("result-display").src = mainCanvas.toDataURL("image/jpeg", 0.95);
+  if(typeof switchPreview === 'function') switchPreview("grid"); 
+
+  // Simpan gallery lokal (resolusi rendah) untuk riwayat
+  const compressedDataUrl = mainCanvas.toDataURL("image/jpeg", 0.3);
+  const newSession = {
+    id: currentSessionId,
+    image: compressedDataUrl,
+    template: selectedTemplate,
+    date: new Date().toLocaleString("id-ID"),
+    driveUrl: "",
+  };
+  gallerySessions.unshift(newSession);
+  saveToLocalStorage();
 }
 
-function updateResultDisplay() {
-  resultDisplay.src = mainCanvas.toDataURL("image/jpeg", 0.95);
+// ==========================================
+// GIF RENDERING
+// ==========================================
+function createAnimatedGif(photos, templateName) {
+  return new Promise((resolve, reject) => {
+    // Kita buat worker lewat Blob agar tidak kena isu CORS saat import script
+    const workerBlob = new Blob(
+      [
+        `
+      importScripts('https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js');
+    `,
+      ],
+      { type: "application/javascript" },
+    );
+    const workerScriptURL = URL.createObjectURL(workerBlob);
+
+    // Secara default frame desain adalah 1200x1800
+    const gifWidth = selectedLayout === "STRIP" ? 600 : 1200;
+    const gifHeight = 1800;
+
+    const gif = new GIF({
+      workers: 2,
+      quality: 10,
+      width: gifWidth,
+      height: gifHeight,
+      workerScript: workerScriptURL,
+    });
+
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = gifWidth;
+    tempCanvas.height = gifHeight;
+    const tempCtx = tempCanvas.getContext("2d");
+
+    let frameImageSrc =
+      templateName === "UMUM" ? "frame-umum-gif.png" : "frame-smp-gif.png";
+    const frameImg = new Image();
+    frameImg.src = frameImageSrc;
+
+    // Ukuran "Video" / Wajah
+    const fotoW = 1012; 
+    const fotoH = 994; 
+
+    // Posisi X dan Y diletakkan melayang di tengah (Bisa kamu utak-atik angkanya jika desain framenya agak atas/bawah)
+    const fotoX = selectedLayout === "STRIP" ? (600 - fotoW) / 2 : (1200 - fotoW) / 2; // Otomatis ke tengah horizontal
+    const fotoY = (1800 - fotoH) / 2; // Otomatis ke tengah vertikal (sekitar Y: 403)
+
+    frameImg.onload = () => {
+      photos.forEach((img) => {
+        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+        const scale = Math.max(fotoW / img.width, fotoH / img.height);
+        const nw = img.width * scale;
+        const nh = img.height * scale;
+
+        tempCtx.save();
+        tempCtx.beginPath();
+        tempCtx.rect(fotoX, fotoY, fotoW, fotoH);
+        tempCtx.clip();
+        // Taruh foto tepat di tengah area fotoX, fotoY
+        tempCtx.drawImage(
+          img,
+          fotoX + (fotoW - nw) / 2,
+          fotoY + (fotoH - nh) / 2,
+          nw,
+          nh,
+        );
+        tempCtx.restore();
+
+        // Gambar frame transparan menimpa di atasnya (full size)
+        tempCtx.drawImage(frameImg, 0, 0, gifWidth, gifHeight);
+
+        // Sisipkan QR Code jika sudah tersedia
+        const qrCanvasElement = document.querySelector("#qr-element canvas");
+        if (qrCanvasElement) {
+          const qrSize = 235;
+          const qrX = selectedLayout === "STRIP" ? 180 : 845;
+          const qrY = selectedLayout === "STRIP" ? 1500 : 1456;
+          tempCtx.drawImage(qrCanvasElement, qrX, qrY, qrSize, qrSize);
+        }
+
+        gif.addFrame(tempCtx, { copy: true, delay: 500 });
+      });
+
+      gif.on("finished", function (blob) {
+        URL.revokeObjectURL(workerScriptURL);
+        resolve(blob);
+      });
+
+      gif.render();
+    };
+
+    frameImg.onerror = () => {
+      console.error("Frame GIF gagal dimuat:", frameImageSrc);
+      URL.revokeObjectURL(workerScriptURL);
+      reject(new Error("Gagal load " + frameImageSrc));
+    };
+  });
 }
 
 // ==========================================
@@ -296,54 +466,75 @@ async function processCloudUpload() {
   const visitorPhone = visitorPhoneNode ? visitorPhoneNode.value : "-";
 
   try {
-    // 1. Panggil GAS untuk Buat Folder & Log
-    // Perhatikan: Kita TIDAK mengirimkan headers Content-Type
-    // agar browser mengirimkannya sebagai text/plain default (menghindari CORS)
+    statusText.innerText = "Processing Cloud... (Mohon tunggu)";
+    
+    // Meminta folder dan mencatat log di server
     const response = await fetch(GOOGLE_SCRIPT_URL, {
+      redirect: "follow",
       method: "POST",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8",
+      },
       body: JSON.stringify({
         action: "create_folder_and_log",
         id_sesi: currentSessionId,
         nama_pengunjung: visitorName,
         no_telepon: visitorPhone,
-        template: selectedTemplate + " (" + selectedLayout + ")",
+        template: selectedTemplate,
       }),
     });
 
-    // Cek apakah response OK sebelum parsing JSON
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
     const folderData = await response.json();
 
     if (folderData.status === "success") {
       lastFolderUrl = folderData.folderUrl;
 
+      // 1. BUAT QR CODE DAN GABUNG KE GRID STATIS
       await generateAndDrawQR(folderData.folderUrl);
-      updateResultDisplay();
 
-      // SIMPAN KE GALERI LOKAL
-      const compressedDataUrl = mainCanvas.toDataURL("image/jpeg", 0.3);
-      const newSession = {
-        id: currentSessionId,
-        image: compressedDataUrl,
-        template: selectedTemplate,
-        date: new Date().toLocaleString("id-ID"),
-        driveUrl: lastFolderUrl,
-      };
+      // Update data galeri dengan driveUrl
+      if (
+        gallerySessions.length > 0 &&
+        gallerySessions[0].id === currentSessionId
+      ) {
+        gallerySessions[0].driveUrl = lastFolderUrl;
+        saveToLocalStorage();
+      }
 
-      gallerySessions.unshift(newSession);
-      saveToLocalStorage();
+      // 2. GENERATE ANIMASI GIF (sekarang bisa mengambil elemen QR karena sudah dirender di awalan)
+      statusText.innerText = "Membuat Animasi GIF Bersama QR... (Mohon tunggu)";
+      const gifBlob = await createAnimatedGif(capturedPhotos, selectedTemplate);
+      const gifUrl = URL.createObjectURL(gifBlob);
 
-      statusText.innerText = "Mengunggah foto ke Cloud (Latar Belakang)...";
+      // Tampilkan GIF
+      document.getElementById("gif-display").src = gifUrl;
+      const btnSave = document.getElementById("btn-save-gif");
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.classList.remove("opacity-50", "cursor-not-allowed", "bg-tertiary-container", "text-on-surface");
+        btnSave.classList.add("bg-[#E1306C]", "text-white");
+      }
+      generatedGifUrl = gifUrl;
+      isGifReady = true;
+
+      // Konversi Blob GIF to Base64 untuk diupload
+      const gifBase64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(gifBlob);
+        reader.onloadend = () => resolve(reader.result);
+      });
+
+      // 3. UPLOAD SEMUA FILE KE DRIVE
+      statusText.innerText = "Mengunggah file ke Google Drive...";
       statusText.classList.remove("animate-pulse");
       statusText.classList.add("text-slate-600");
 
+      // 4 Foto Mentahan
       const uploads = capturedPhotos.map((img, i) =>
         uploadSingleFile(img.src, `Pose_${i + 1}.jpg`, folderData.folderId),
       );
 
+      // Upload Foto Grid
       uploads.push(
         uploadSingleFile(
           mainCanvas.toDataURL("image/jpeg", 0.95),
@@ -352,103 +543,12 @@ async function processCloudUpload() {
         ),
       );
 
-      await Promise.all(uploads);
-
-      statusText.innerHTML = "✅ Data tersimpan di Database & Cloud!";
-      statusText.classList.replace("text-slate-600", "text-green-600");
-    } else {
-      throw new Error(folderData.message || "Error dari Apps Script");
-    }
-  } catch (err) {
-    console.error("Gagal Upload:", err);
-    statusText.innerHTML =
-      "❌ Koneksi ke Database Gagal. Periksa Console (F12).";
-    statusText.classList.add("text-red-500");
-  }
-}
-
-async function uploadSingleFile(base64Str, filename, folderId) {
-  const cleanBase64 = base64Str.split(",")[1];
-
-  // Sama seperti di atas, hindari penggunaan headers
-  return fetch(GOOGLE_SCRIPT_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      action: "upload_file",
-      folderId: folderId,
-      image: cleanBase64,
-      filename: filename,
-    }),
-  });
-}
-// CLOUD STORAGE & DATABASE
-// ==========================================
-async function processCloudUpload() {
-  const statusText = document.getElementById("upload-status-text");
-
-  const visitorNameNode = document.getElementById("visitor-name");
-  const visitorPhoneNode = document.getElementById("visitor-phone");
-  const visitorName = visitorNameNode
-    ? visitorNameNode.value
-    : "Pengunjung Anonim";
-  const visitorPhone = visitorPhoneNode ? visitorPhoneNode.value : "-";
-
-  try {
-    // Dihapus pengaturan header agar browser menggunakan default text/plain
-    // Ini adalah kunci agar lolos dari blokir CORS Google
-    const response = await fetch(
-      "https://script.google.com/macros/s/AKfycbyfQY3WrU1Wv1HI3QxELvQSB-tqV7iJ3p6Pi0Vt86iCyIaYMfQt-b3wzQGwAtwoFpA/exec",
-      {
-        redirect: "follow", // Tambahkan baris ini
-        method: "POST",
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8", // Tambahkan baris ini
-        },
-        body: JSON.stringify({
-          action: "create_folder_and_log",
-          id_sesi: currentSessionId,
-          nama_pengunjung: visitorName,
-          no_telepon: visitorPhone,
-          template: selectedTemplate + " (" + selectedLayout + ")",
-        }),
-      },
-    );
-
-    const folderData = await response.json();
-
-    if (folderData.status === "success") {
-      lastFolderUrl = folderData.folderUrl;
-
-      await generateAndDrawQR(folderData.folderUrl);
-      updateResultDisplay();
-
-      // SIMPAN KE GALERI LOKAL (Gunakan resolusi rendah untuk menghindari QuotaExceededError)
-      const compressedDataUrl = mainCanvas.toDataURL("image/jpeg", 0.3);
-      const newSession = {
-        id: currentSessionId,
-        image: compressedDataUrl,
-        template: selectedTemplate,
-        date: new Date().toLocaleString("id-ID"),
-        driveUrl: lastFolderUrl,
-      };
-
-      gallerySessions.unshift(newSession);
-      saveToLocalStorage();
-
-      statusText.innerText = "Mengunggah foto ke Cloud (Latar Belakang)...";
-      statusText.classList.remove("animate-pulse");
-      statusText.classList.add("text-slate-600");
-
-      const uploads = capturedPhotos.map((img, i) =>
-        uploadSingleFile(img.src, `Pose_${i + 1}.jpg`, folderData.folderId),
-      );
+      // Upload File GIF Utama
+      const cleanName = visitorName.replace(/\s+/g, "_");
+      const dynamicFilename = `Hasil_GIF_${cleanName}_${selectedTemplate}.gif`;
 
       uploads.push(
-        uploadSingleFile(
-          mainCanvas.toDataURL("image/jpeg", 0.95),
-          "Final_Photobooth.jpg",
-          folderData.folderId,
-        ),
+        uploadSingleFile(gifBase64, dynamicFilename, folderData.folderId),
       );
 
       await Promise.all(uploads);
@@ -502,6 +602,12 @@ async function generateAndDrawQR(url) {
     const qrX = selectedLayout === "STRIP" ? 180 : 845;
     const qrY = selectedLayout === "STRIP" ? 1500 : 1456;
     ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
+    
+    // Update visual pratinjau di layar agar pengunjung bisa melihat QR Code-nya langsung menempel
+    const resultDisplay = document.getElementById("result-display");
+    if(resultDisplay) {
+        resultDisplay.src = mainCanvas.toDataURL("image/jpeg", 0.95);
+    }
   }
 }
 
@@ -662,15 +768,151 @@ function shareWA() {
   document.getElementById("wa-number").value = "";
 }
 
+function downloadResult() {
+  if (!isGifReady || !generatedGifUrl) {
+    alert("GIF masih diproses. Silakan tunggu sebentar.");
+    return;
+  }
+  const link = document.createElement("a");
+  link.download = `Hasil_Photobooth_${selectedTemplate}_${Date.now()}.gif`;
+  link.href = generatedGifUrl;
+  link.click();
+}
+
 function downloadImage() {
   const link = document.createElement("a");
-  link.download = `Photobooth_Kelas9_${Date.now()}.jpg`;
+  link.download = `Photobooth_Grid_${Date.now()}.jpg`;
   link.href = mainCanvas.toDataURL("image/jpeg", 0.98);
   link.click();
+}
+
+function switchPreview(type) {
+  const gridTab = document.getElementById("tab-grid");
+  const gifTab = document.getElementById("tab-gif");
+  const gridImg = document.getElementById("result-display");
+  const gifImg = document.getElementById("gif-display");
+
+  if (!gridTab || !gifTab || !gridImg || !gifImg) return;
+
+  if (type === "grid") {
+    gridImg.classList.remove("hidden");
+    gifImg.classList.add("hidden");
+    gridTab.className =
+      "px-4 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-md transition-all";
+    gifTab.className =
+      "px-4 py-2 bg-white text-slate-500 rounded-full font-bold text-sm shadow-md transition-all";
+  } else if (type === "gif") {
+    if (!isGifReady) {
+      alert("GIF sedang dibuat, harap tunggu...");
+      return;
+    }
+    gridImg.classList.add("hidden");
+    gifImg.classList.remove("hidden");
+    gifTab.className =
+      "px-4 py-2 bg-primary text-white rounded-full font-bold text-sm shadow-md transition-all";
+    gridTab.className =
+      "px-4 py-2 bg-white text-slate-500 rounded-full font-bold text-sm shadow-md transition-all";
+  }
 }
 
 function resetApp() {
   if (confirm("Mulai sesi baru? Foto yang belum disimpan akan hilang.")) {
     location.reload();
+  }
+}
+// ==========================================
+// VOICE COMMAND (PENGENDALI SUARA)
+// ==========================================
+// Cek dukungan browser untuk fitur suara
+const SpeechRecognition =
+  window.SpeechRecognition || window.webkitSpeechRecognition;
+
+let recognition;
+let isVoiceActive = false;
+
+if (SpeechRecognition) {
+  recognition = new SpeechRecognition();
+  recognition.continuous = true; // Biar mic dengerin terus
+  recognition.interimResults = false;
+  recognition.lang = "id-ID"; // Pakai bahasa Indonesia (tetap bisa nangkep kata "cheese")
+
+  recognition.onstart = function () {
+    console.log("🎤 Mic aktif! Teriak 'Cheese', 'Foto', atau 'Siap'.");
+    const micUI = document.getElementById("mic-indicator");
+    if (micUI) {
+      micUI.classList.remove("hidden");
+      micUI.classList.add("flex");
+    }
+  };
+
+  recognition.onresult = function (event) {
+    // Ambil kata-kata terakhir yang diucapkan pengunjung
+    const current = event.resultIndex;
+    const transcript = event.results[current][0].transcript.toLowerCase();
+
+    console.log("🗣️ Pengunjung bilang: ", transcript);
+
+    // Cek apakah kata kuncinya diucapkan
+    if (
+      transcript.includes("cheese") ||
+      transcript.includes("baitul maal") ||
+      transcript.includes("foto") ||
+      transcript.includes("siap")
+    ) {
+      const btn = document.getElementById("btn-start-capture");
+
+      // Pastikan tombol lagi bisa diklik (lagi nggak proses jepret)
+      if (btn && !btn.disabled) {
+        console.log("📸 Kata kunci cocok! Mulai hitung mundur...");
+        startSequenceCapture();
+      }
+    }
+  };
+
+  recognition.onerror = function (event) {
+    console.error("❌ Error dari Voice Command:", event.error);
+    if (event.error === "not-allowed") {
+      isVoiceActive = false;
+      const micUI = document.getElementById("mic-indicator");
+      if (micUI) {
+        micUI.classList.add("hidden");
+        micUI.classList.remove("flex");
+      }
+    }
+  };
+
+  recognition.onend = function () {
+    // Start ulang otomotis supaya nggak putus di tengah jalan, KECUALI dimatikan
+    if (isVoiceActive) {
+      try {
+        recognition.start();
+      } catch (e) {}
+    } else {
+      const micUI = document.getElementById("mic-indicator");
+      if (micUI) {
+        micUI.classList.add("hidden");
+        micUI.classList.remove("flex");
+      }
+    }
+  };
+} else {
+  console.log("⚠️ Yah, browser ini belum support perintah suara.");
+}
+
+function startVoiceCommand() {
+  if (recognition && !isVoiceActive) {
+    isVoiceActive = true;
+    try {
+      recognition.start();
+    } catch (e) {}
+  }
+}
+
+function stopVoiceCommand() {
+  isVoiceActive = false;
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch (e) {}
   }
 }
