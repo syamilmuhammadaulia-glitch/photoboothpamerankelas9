@@ -7,97 +7,138 @@
     "opsz" 24;
 }
 
-/* Base Typography */
+/* Base Typography & Globals */
 body {
   font-family: "Plus Jakarta Sans", sans-serif;
+  background-color: #f8fafc;
+  /* Premium Animated Mesh Gradient Background */
+  background-image: 
+    radial-gradient(at 40% 20%, hsla(228,100%,74%,0.15) 0px, transparent 50%),
+    radial-gradient(at 80% 0%, hsla(189,100%,56%,0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, hsla(355,100%,93%,0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 50%, hsla(340,100%,76%,0.1) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, hsla(22,100%,77%,0.1) 0px, transparent 50%),
+    radial-gradient(at 80% 100%, hsla(242,100%,70%,0.15) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, hsla(343,100%,76%,0.1) 0px, transparent 50%);
+  background-attachment: fixed;
 }
 
-h1,
-h2,
-h3 {
+h1, h2, h3, .font-headline {
   font-family: "Spline Sans", sans-serif;
 }
 
 /* Custom Gradients & Backgrounds */
 .hero-gradient {
-  background: linear-gradient(135deg, #0846ed 0%, #859aff 100%);
+  background: linear-gradient(135deg, #0846ed 0%, #a485ff 100%);
+  background-size: 200% 200%;
+  animation: gradientFlow 5s ease infinite;
+}
+
+@keyframes gradientFlow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
 }
 
 .glass-nav {
-  background: rgba(245, 246, 247, 0.8);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
 /* Flash Efek untuk UI Kamera */
 .flash-effect {
-  opacity: 0.2;
-  background-color: white;
+  animation: flash 0.15s ease-out;
 }
 
-/* Container untuk output QR JS (Fix bug border hitam) */
+@keyframes flash {
+  0% { opacity: 1; background-color: white; }
+  100% { opacity: 0; }
+}
+
+/* Hover & Active States */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -8px rgba(8, 70, 237, 0.25);
+}
+
+.btn-press {
+  transition: transform 0.1s;
+}
+.btn-press:active {
+  transform: scale(0.96);
+}
+
+/* Container untuk output QR JS */
 #qr-element img {
   margin: 0 auto;
-}
-/* Styling Ikon Material */
-.material-symbols-outlined {
-  font-variation-settings:
-    "FILL" 0,
-    "wght" 400,
-    "GRAD" 0,
-    "opsz" 24;
-}
-
-/* Base Typography */
-body {
-  font-family: "Plus Jakarta Sans", sans-serif;
-}
-
-h1,
-h2,
-h3 {
-  font-family: "Spline Sans", sans-serif;
-}
-
-/* Custom Gradients & Backgrounds */
-.hero-gradient {
-  background: linear-gradient(135deg, #0846ed 0%, #859aff 100%);
-}
-
-.glass-nav {
-  background: rgba(245, 246, 247, 0.8);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-}
-
-/* Flash Efek untuk UI Kamera */
-.flash-effect {
-  opacity: 0.2;
-  background-color: white;
-}
-
-/* Container untuk output QR JS (Fix bug border hitam) */
-#qr-element img {
-  margin: 0 auto;
+  border-radius: 12px;
+  padding: 8px;
+  background: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
 }
 
 /* Sidebar Active State Class */
 .active-nav {
-  background-color: #eff6ff !important; /* Tailwind blue-50 */
-  color: #2563eb !important; /* Tailwind blue-600 */
+  background: linear-gradient(90deg, #eff6ff 0%, transparent 100%) !important;
+  color: #2563eb !important;
+  border-left: 4px solid #2563eb;
 }
+
 /* Gallery Card Styles */
 .gallery-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
 }
 .gallery-card:hover {
-  transform: translateY(-8px);
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
 }
 .action-overlay {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.4) 50%, transparent 100%);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 .gallery-card:hover .action-overlay {
   opacity: 1;
+}
+
+/* Glowing text effects */
+.glow-text {
+  text-shadow: 0 0 20px rgba(8, 70, 237, 0.4);
+}
+
+/* Smooth fade in */
+.animate-fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Animated Countdown Number */
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.countdown-pop {
+  animation: popIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
